@@ -1,45 +1,45 @@
 import numpy as np
-import torch.optim as optimizer
+import torch
+import torch.optim as optim
 from torch.utils.data import DataLoader
+from input_pipeline import PairDataset
 from model import Generator
-from data_provider import PairDataset
 
 
 def main():
 
-    generator = Generator().cuda()
-
     dataset = PairDataset(
         first_dir='',
-        second_dir=''
+        second_dir='',
+        num_samples=1000
     )
-
     data_loader = DataLoader(
         dataset=dataset,
-        batch_size=args.batch_size,
-        shuffle=True,
-        num_workers=args.worker,
-        pin_memory=True,
+        batch_size=32, shuffle=True,
+        num_workers=1, pin_memory=True
     )
+    generator = Generator().cuda()
+    optimizer = optim.Adam(lr=1e-4, params=generator.parameters())
 
-    for epoch in range(args.epoches):
-        train_iter = iter(data_loader)
-        for i in range(len(data_loader)):
-
-            x, y = next(train_iter)
-            if args.use_cuda:
+    for epoch in range(10):
+        
+        for i, (x, y) in enumerate(data_loader):
+            
+            if np.random.rand() > 0.5:
                 x = x.cuda()
-                y = y.cuda()
+            else:
+                x = y.cuda()
+            
+            restored_x = generator(x)
+            loss = ((restored_x - x)**2).sum()/x.size(0)
 
-            loss = wespe.train_step(x, y)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
-            print("e:{} i:{} content loss: {}, tv loss:{}, gen_color_loss: {}, gen_texture_loss:{}, "
-                  "discri_color_loss: {}, discri_texture_loss: {}".format(epoch, i, loss['content'],
-                                                                          loss['tv'], loss['gen_dc'],
-                                                                          loss['gen_dt'], loss['color_loss'],
-                                                                          loss['texture_loss']))
-        wespe.save_model(args.save_model_path)
+            print('e:{0} i:{1} loss: {2:.3f}'.format(epoch, i, loss.item()))
+    
+    torch.save(generator.state_dict(), 'models/pretrained_generator.pth')
 
 
-if __name__ == '__main__':
-    main()
+main()

@@ -2,7 +2,7 @@ import numpy as np
 import torch.optim as optimizer
 from torch.utils.data import DataLoader
 from model import WESPE
-from data_provider import PairDataset
+from input_pipeline import PairDataset
 
 
 def main():
@@ -11,23 +11,22 @@ def main():
 
     dataset = PairDataset(
         first_dir='',
-        second_dir=''
+        second_dir='',
+        num_samples=1000
     )
 
     data_loader = DataLoader(
         dataset=dataset,
-        batch_size=30, shuffle=False,
+        batch_size=30, shuffle=True,
         num_workers=1, pin_memory=True
     )
 
     for epoch in range(10):
-        train_iter = iter(data_loader)
-        for i in range(len(data_loader)):
+        
+        for i, (x, y) in enumerate(data_loader):
 
-            x, y = next(train_iter)
-            if args.use_cuda:
-                x = x.cuda()
-                y = y.cuda()
+            x = x.cuda()
+            y = y.cuda()
 
             loss = wespe.train_step(x, y)
 
@@ -36,8 +35,7 @@ def main():
                                                                           loss['tv'], loss['gen_dc'],
                                                                           loss['gen_dt'], loss['color_loss'],
                                                                           loss['texture_loss']))
-        wespe.save_model(args.save_model_path)
+        wespe.save_model('models/')
 
 
-if __name__ == '__main__':
-    main()
+main()

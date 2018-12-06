@@ -10,8 +10,8 @@ class ConvBlock(nn.Module):
 
     def __init__(self):
         super(ConvBlock, self).__init__()
-        self.conv1 = nn.Conv2d(64, 64, 3, padding=1)
-        self.conv2 = nn.Conv2d(64, 64, 3, padding=1)
+        self.conv1 = nn.Conv2d(64, 64, 3, padding=1, bias=False)
+        self.conv2 = nn.Conv2d(64, 64, 3, padding=1, bias=False)
         self.instance_norm1 = nn.InstanceNorm2d(64, affine=True)
         self.instance_norm2 = nn.InstanceNorm2d(64, affine=True)
         self.relu = nn.ReLU(inplace=True)
@@ -83,7 +83,7 @@ class Generator(nn.Module):
         x = self.blocks(x)
         x = F.relu(self.conv2(x))
         x = F.relu(self.conv3(x))
-        x = F.tanh(self.conv4(x)) * 0.5 + 0.5
+        x = torch.tanh(self.conv4(x)) * 0.5 + 0.5
         return x
 
 
@@ -133,8 +133,8 @@ class VGG(nn.Module):
         self.model = vgg19(pretrained=True).features[:-1]
         self.mean = torch.Tensor([0.485, 0.456, 0.406]).cuda().view(1, 3, 1, 1)
         self.std = torch.Tensor([0.229, 0.224, 0.225]).cuda().view(1, 3, 1, 1)
-        for param in self.model.parameters():
-            param.requires_grad = False
+        for p in self.model.parameters():
+            p.requires_grad = False
 
     def forward(self, x):
         """
@@ -163,12 +163,12 @@ class TVLoss(nn.Module):
             a float tensor with shape [].
         """
 
-        batch_size, c, h, w = x.size()
-        count_h = c * (h - 1) * w
-        count_w = c * h * (w - 1)
+        b, c, h, w = x.size()
+        # count_h = c * (h - 1) * w
+        # count_w = c * h * (w - 1)
         h_tv = torch.pow((x[:, :, 1:, :] - x[:, :, :(h - 1), :]), 2).sum()
         w_tv = torch.pow((x[:, :, :, 1:] - x[:, :, :, :(w - 1)]), 2).sum()
-        return 2.0*(h_tv/count_h + w_tv/count_w)/batch_size
+        return 2.0*(h_tv + w_tv)/b
 
 
 class WESPE:
@@ -201,43 +201,48 @@ class WESPE:
         y_fake = self.generator_g(x)
         x_fake = self.generator_f(y_fake)
 
-        self.g_optimizer.zero_grad()
-        self.f_optimizer.zero_grad()
+        for p in self.discriminator_t.parameters():
+            p.requires_grad = False
+        for p in self.discriminator_c.parameters():
+            p.requires_grad = False
 
         # content loss
-        vgg_x_true = self.vgg(x).detach()
+        vgg_x_true = self.vgg(x)
         vgg_x_fake = self.vgg(x_fake)
         content_loss = self.content_criterion(vgg_x_fake, vgg_x_true)
 
         # tv loss
         _, c, h, w = y_fake.size()
-        tv_loss = 1.0/(c * h * w) * self.tv_criterion(y_fake)
+        tv_loss = (1.0/(c * h * w)) * self.tv_criterion(y_fake)
 
-        pos_labels = torch.ones(batch_size, dtype=torch.long, device=x.device)
-        neg_labels = torch.zeros(batch_size, dtype=torch.long, device=x.device)
+        pos_labels = torch.ones(batch_size, dtype=torch.float, device=x.device)
+        neg_labels = torch.zeros(batch_size, dtype=torch.float, device=x.device)
 
         y_fake_blur = self.blur(y_fake)
-        y_real_blur = self.blur(y)
-
         y_fake_blur_dc_pred = self.discriminator_c(y_fake_blur)
-        y_real_blur_dc_pred = self.discriminator_c(y_real_blur)
         gen_dc_loss = self.color_criterion(y_fake_blur_dc_pred, pos_labels)
 
         y_fake_gray = self.gray(y_fake)
-        y_real_gray = self.gray(y)
-
         y_fake_gray_dt_pred = self.discriminator_t(y_fake_gray)
-        y_real_gray_dt_pred = self.discriminator_t(y_real_gray)
         gen_dt_loss = self.texture_criterion(y_fake_gray_dt_pred, pos_labels)
 
         generator_loss = content_loss + 10.0 * tv_loss + (gen_dc_loss + gen_dt_loss) * 5e-3
 
+        self.g_optimizer.zero_grad()
+        self.f_optimizer.zero_grad()
         generator_loss.backward()
         self.g_optimizer.step()
         self.f_optimizer.step()
 
-        self.c_optimizer.zero_grad()
-        self.t_optimizer.zero_grad()
+        for p in self.discriminator_t.parameters():
+            p.requires_grad = True
+        for p in self.discriminator_c.parameters():
+            p.requires_grad = True
+
+        y_real_blur = self.blur(y)
+        y_real_gray = self.gray(y)
+        y_real_blur_dc_pred = self.discriminator_c(y_real_blur)
+        y_real_gray_dt_pred = self.discriminator_t(y_real_gray)
 
         y_fake_blur_dc_pred = self.discriminator_c(y_fake_blur.detach())
         dc_loss = self.color_criterion(y_fake_blur_dc_pred, neg_labels) \
@@ -247,8 +252,10 @@ class WESPE:
         dt_loss = self.texture_criterion(y_fake_gray_dt_pred, neg_labels) \
             + self.texture_criterion(y_real_gray_dt_pred, pos_labels)
 
-        discriminator_loss = (dt_loss + dc_loss) * 5e-3
+        discriminator_loss = dt_loss + dc_loss
 
+        self.c_optimizer.zero_grad()
+        self.t_optimizer.zero_grad()
         discriminator_loss.backward()
         self.c_optimizer.step()
         self.t_optimizer.step()
@@ -265,18 +272,7 @@ class WESPE:
         return loss_dict
 
     def save_model(self, model_path):
-        torch.save(self.generator_f.state_dict(), model_path+'_generator_f.pth')
-        torch.save(self.generator_g.state_dict(), model_path+'_generator_g.pth')
-        torch.save(self.discriminator_t.state_dict(), model_path+'_discriminator_t.pth')
-        torch.save(self.discriminator_c.state_dict(), model_path+'_discriminator_c.pth')
-
-    def load_model(self, model_path, only_gen):
-        self.generator_f.load_state_dict(torch.load(model_path+'_generator_f.pth'))
-        self.generator_g.load_state_dict(torch.load(model_path+'_generator_g.pth'))
-        if not only_gen:
-            self.discriminator_c.load_state_dict(torch.load(model_path + '_discriminator_c.pth'))
-            self.discriminator_t.load_state_dict(torch.load(model_path + '_discriminator_t.pth'))
-
-    def inference(self, x):
-
-        return self.generator_g(x)
+        torch.save(self.generator_f.state_dict(), model_path + '_generator_f.pth')
+        torch.save(self.generator_g.state_dict(), model_path + '_generator_g.pth')
+        torch.save(self.discriminator_t.state_dict(), model_path + '_discriminator_t.pth')
+        torch.save(self.discriminator_c.state_dict(), model_path + '_discriminator_c.pth')
