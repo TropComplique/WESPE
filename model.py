@@ -1,9 +1,8 @@
-import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision.models import vgg19
 import torch.optim as optim
+from torchvision.models import vgg19
 
 
 class ConvBlock(nn.Module):
@@ -164,11 +163,9 @@ class TVLoss(nn.Module):
         """
 
         b, c, h, w = x.size()
-        # count_h = c * (h - 1) * w
-        # count_w = c * h * (w - 1)
         h_tv = torch.pow((x[:, :, 1:, :] - x[:, :, :(h - 1), :]), 2).sum()
         w_tv = torch.pow((x[:, :, :, 1:] - x[:, :, :, :(w - 1)]), 2).sum()
-        return 2.0*(h_tv + w_tv)/b
+        return (h_tv + w_tv)/b
 
 
 class WESPE:
@@ -185,10 +182,10 @@ class WESPE:
         self.color_criterion = nn.BCEWithLogitsLoss().cuda()
         self.texture_criterion = nn.BCEWithLogitsLoss().cuda()
 
-        self.g_optimizer = optim.Adam(lr=1e-4, params=self.generator_g.parameters())
-        self.f_optimizer = optim.Adam(lr=1e-4, params=self.generator_f.parameters())
-        self.t_optimizer = optim.Adam(lr=1e-4, params=self.discriminator_t.parameters())
-        self.c_optimizer = optim.Adam(lr=1e-4, params=self.discriminator_c.parameters())
+        self.g_optimizer = optim.Adam(lr=5e-4, params=self.generator_g.parameters())
+        self.f_optimizer = optim.Adam(lr=5e-4, params=self.generator_f.parameters())
+        self.t_optimizer = optim.Adam(lr=5e-4, params=self.discriminator_t.parameters())
+        self.c_optimizer = optim.Adam(lr=5e-4, params=self.discriminator_c.parameters())
 
         self.vgg = VGG().cuda()
         self.blur = GaussianBlur().cuda()
