@@ -88,7 +88,7 @@ class Generator(nn.Module):
 
 class Discriminator(nn.Module):
 
-    def __init__(self, num_input_channels):
+    def __init__(self, image_size, num_input_channels):
         super(Discriminator, self).__init__()
         self.conv_layers = nn.Sequential(
             nn.Conv2d(num_input_channels, 48, 11, stride=4, padding=5),
@@ -106,20 +106,22 @@ class Discriminator(nn.Module):
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
             nn.InstanceNorm2d(128, affine=True),
         )
-        self.fc = nn.Linear(128 * 7 * 7, 1024)
+
+        self.final_area = (image_size // 16) ** 2
+        self.fc = nn.Linear(128 * self.final_area, 1024)
         self.out = nn.Linear(1024, 1)
 
     def forward(self, x):
         """
         Arguments:
             x: a float tensor with shape [b, num_input_channels, h, w].
-            It has values in [0, 1] range. And h = w = 64.
+            It has values in [0, 1] range.
         Returns:
             a float tensor with shape [b].
         """
         b = x.size(0)
         x = self.conv_layers(x)
-        x = x.view(b, 128 * 7 * 7)
+        x = x.view(b, 128 * self.final_area)
         x = F.leaky_relu(self.fc(x), negative_slope=0.2)
         x = self.out(x).view(b)
         return x
@@ -165,20 +167,21 @@ class TVLoss(nn.Module):
         b, c, h, w = x.size()
         h_tv = torch.pow((x[:, :, 1:, :] - x[:, :, :(h - 1), :]), 2).sum()
         w_tv = torch.pow((x[:, :, :, 1:] - x[:, :, :, :(w - 1)]), 2).sum()
-        return (h_tv + w_tv)/b
+        return (h_tv + w_tv)/(b * c * h * w)
 
 
 class WESPE:
 
-    def __init__(self):
+    def __init__(self, image_size, use_pretrained_generator=False):
 
         self.generator_g = Generator().cuda()
         self.generator_f = Generator().cuda()
-        self.discriminator_c = Discriminator(num_input_channels=3).cuda()
-        self.discriminator_t = Discriminator(num_input_channels=1).cuda()
-        
-        self.generator_g.load_state_dict(torch.load('models/pretrained_generator.pth'))
-        self.generator_f.load_state_dict(torch.load('models/pretrained_generator.pth'))
+        self.discriminator_c = Discriminator(image_size, num_input_channels=3).cuda()
+        self.discriminator_t = Discriminator(image_size, num_input_channels=1).cuda()
+
+        if use_pretrained_generator:
+            self.generator_g.load_state_dict(torch.load('models/pretrained_generator.pth'))
+            self.generator_f.load_state_dict(torch.load('models/pretrained_generator.pth'))
 
         self.content_criterion = lambda x, y: ((x - y)**2).sum()/x.numel()
         self.tv_criterion = TVLoss().cuda()
@@ -187,8 +190,8 @@ class WESPE:
 
         self.g_optimizer = optim.Adam(lr=5e-4, params=self.generator_g.parameters())
         self.f_optimizer = optim.Adam(lr=5e-4, params=self.generator_f.parameters())
-        self.t_optimizer = optim.Adam(lr=5e-4, params=self.discriminator_t.parameters())
         self.c_optimizer = optim.Adam(lr=5e-4, params=self.discriminator_c.parameters())
+        self.t_optimizer = optim.Adam(lr=5e-4, params=self.discriminator_t.parameters())
 
         self.vgg = VGG().cuda()
         self.blur = GaussianBlur().cuda()
@@ -196,37 +199,30 @@ class WESPE:
 
     def train_step(self, x, y):
 
-        batch_size = x.size(0)
-
         y_fake = self.generator_g(x)
         x_fake = self.generator_f(y_fake)
 
-        for p in self.discriminator_t.parameters():
-            p.requires_grad = False
         for p in self.discriminator_c.parameters():
             p.requires_grad = False
+        for p in self.discriminator_t.parameters():
+            p.requires_grad = False
 
-        # content loss
         vgg_x_true = self.vgg(x)
         vgg_x_fake = self.vgg(x_fake)
         content_loss = self.content_criterion(vgg_x_fake, vgg_x_true)
+        tv_loss = self.tv_criterion(y_fake)
 
-        # tv loss
-        _, c, h, w = y_fake.size()
-        tv_loss = (1.0/(c * h * w)) * self.tv_criterion(y_fake)
-
+        batch_size = x.size(0)
         pos_labels = torch.ones(batch_size, dtype=torch.float, device=x.device)
         neg_labels = torch.zeros(batch_size, dtype=torch.float, device=x.device)
 
         y_fake_blur = self.blur(y_fake)
-        y_fake_blur_dc_pred = self.discriminator_c(y_fake_blur)
-        gen_dc_loss = self.color_criterion(y_fake_blur_dc_pred, pos_labels)
-
+        color_generation_loss = self.color_criterion(self.discriminator_c(y_fake_blur), pos_labels)
         y_fake_gray = self.gray(y_fake)
-        y_fake_gray_dt_pred = self.discriminator_t(y_fake_gray)
-        gen_dt_loss = self.texture_criterion(y_fake_gray_dt_pred, pos_labels)
+        texture_generation_loss = self.texture_criterion(self.discriminator_t(y_fake_gray), pos_labels)
 
-        generator_loss = content_loss + 10.0 * tv_loss + (gen_dc_loss + gen_dt_loss) * 5e-3
+        generator_loss = content_loss + 10.0 * tv_loss
+        generator_loss += 5e-3 * (color_generation_loss + texture_generation_loss)
 
         self.g_optimizer.zero_grad()
         self.f_optimizer.zero_grad()
@@ -234,25 +230,21 @@ class WESPE:
         self.g_optimizer.step()
         self.f_optimizer.step()
 
-        for p in self.discriminator_t.parameters():
-            p.requires_grad = True
         for p in self.discriminator_c.parameters():
+            p.requires_grad = True
+        for p in self.discriminator_t.parameters():
             p.requires_grad = True
 
         y_real_blur = self.blur(y)
         y_real_gray = self.gray(y)
-        y_real_blur_dc_pred = self.discriminator_c(y_real_blur)
-        y_real_gray_dt_pred = self.discriminator_t(y_real_gray)
 
-        y_fake_blur_dc_pred = self.discriminator_c(y_fake_blur.detach())
-        dc_loss = self.color_criterion(y_fake_blur_dc_pred, neg_labels) \
-            + self.color_criterion(y_real_blur_dc_pred, pos_labels)
+        color_discriminator_loss = self.color_criterion(self.discriminator_c(y_real_blur), pos_labels) \
+            + self.color_criterion(self.discriminator_c(y_fake_blur.detach()), neg_labels)
 
-        y_fake_gray_dt_pred = self.discriminator_t(y_fake_gray.detach())
-        dt_loss = self.texture_criterion(y_fake_gray_dt_pred, neg_labels) \
-            + self.texture_criterion(y_real_gray_dt_pred, pos_labels)
+        texture_discriminator_loss = self.texture_criterion(self.discriminator_t(y_real_gray), pos_labels) \
+            + self.texture_criterion(self.discriminator_t(y_fake_gray.detach()), neg_labels)
 
-        discriminator_loss = dt_loss + dc_loss
+        discriminator_loss = color_discriminator_loss + texture_discriminator_loss
 
         self.c_optimizer.zero_grad()
         self.t_optimizer.zero_grad()
@@ -261,14 +253,13 @@ class WESPE:
         self.t_optimizer.step()
 
         loss_dict = {
-            "content": content_loss.item(),
-            "tv": tv_loss.item(),
-            "gen_dc": gen_dc_loss.item(),
-            "gen_dt": gen_dt_loss.item(),
-            "texture_loss": dt_loss.item(),
-            "color_loss": dc_loss.item()
+            'content': content_loss.item(),
+            'tv': tv_loss.item(),
+            'color_generation': color_generation_loss.item(),
+            'texture_generation': texture_generation_loss.item(),
+            'color_discriminator': color_discriminator_loss.item()
+            'texture_discriminator': texture_discriminator_loss.item(),
         }
-
         return loss_dict
 
     def save_model(self, model_path):
