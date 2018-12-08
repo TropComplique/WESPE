@@ -17,7 +17,7 @@ def main():
     )
     wespe = WESPE()
 
-    for epoch in range(10):
+    for epoch in range(50):
         for i, (x, y) in enumerate(data_loader):
 
             x = x.cuda()
@@ -25,12 +25,12 @@ def main():
             losses = wespe.train_step(x, y)
 
             text = 'e:{0}, i:{1}, content loss: {2:.3f}, tv loss: {3:.3f}, gen_color_loss: {4:.3f}, ' +\
-                   'gen_texture_loss:{5:.3f}, discri_color_loss: {6:.3f}, discri_texture_loss: {7:.3f}'
+                   'gen_texture_loss: {5:.3f}, discri_color_loss: {6:.3f}, discri_texture_loss: {7:.3f}'
             print(text.format(
                 epoch, i, losses['content'], losses['tv'], losses['gen_dc'],
                 losses['gen_dt'], losses['color_loss'], losses['texture_loss']
             ))
-        wespe.save_model('models/run00')
+        wespe.save_model('models/run01')
 
 
 main()

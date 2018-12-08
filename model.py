@@ -106,7 +106,7 @@ class Discriminator(nn.Module):
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
             nn.InstanceNorm2d(128, affine=True),
         )
-        self.fc = nn.Linear(128 * 4 * 4, 1024)
+        self.fc = nn.Linear(128 * 7 * 7, 1024)
         self.out = nn.Linear(1024, 1)
 
     def forward(self, x):
@@ -119,7 +119,7 @@ class Discriminator(nn.Module):
         """
         b = x.size(0)
         x = self.conv_layers(x)
-        x = x.view(b, 128 * 4 * 4)
+        x = x.view(b, 128 * 7 * 7)
         x = F.leaky_relu(self.fc(x), negative_slope=0.2)
         x = self.out(x).view(b)
         return x
@@ -176,6 +176,9 @@ class WESPE:
         self.generator_f = Generator().cuda()
         self.discriminator_c = Discriminator(num_input_channels=3).cuda()
         self.discriminator_t = Discriminator(num_input_channels=1).cuda()
+        
+        self.generator_g.load_state_dict(torch.load('models/pretrained_generator.pth'))
+        self.generator_f.load_state_dict(torch.load('models/pretrained_generator.pth'))
 
         self.content_criterion = lambda x, y: ((x - y)**2).sum()/x.numel()
         self.tv_criterion = TVLoss().cuda()

@@ -6,13 +6,13 @@ from torchvision import transforms
 from torch.utils.data import Dataset
 
 
-IMAGE_SIZE = 64
+IMAGE_SIZE = 112
 
 
 transform = transforms.Compose([
     transforms.RandomCrop(IMAGE_SIZE),
     transforms.RandomHorizontalFlip(),
-    transforms.RandomVerticalFlip(),
+    # transforms.RandomVerticalFlip(),
     transforms.ToTensor(),
 ])
 
