@@ -10,15 +10,9 @@ import json
 NUM_STEPS = 15000
 IMAGE_SIZE = 112
 BATCH_SIZE = 32
-MODEL_SAVE_PREFIX = 'models/run03'
-TRAIN_LOGS = 'losses_run03.json'
+MODEL_SAVE_PREFIX = 'models/run00'
+TRAIN_LOGS = 'losses_run00.json'
 
-"""
-run00: if np.random.rand() > 0.5:
-run01: no if np.random.rand() > 0.5:
-run02: 5e-4 -> 1e-5
-run03: 1e-5 -> 5e-5
-"""
 
 def main():
 
