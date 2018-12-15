@@ -1,3 +1,5 @@
+import numpy as np
+from scipy import signal
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -21,15 +23,18 @@ class ConvBlock(nn.Module):
         return y
 
 
+def get_kernel(size=21, std=3):
+    """Returns a 2D Gaussian kernel array."""
+    k = signal.gaussian(size, std=std).reshape(size, 1)
+    k = np.outer(k, k)
+    return k/k.sum()
+
+
 class GaussianBlur(nn.Module):
 
     def __init__(self):
         super(GaussianBlur, self).__init__()
-        kernel = [
-            [0.03797616, 0.044863533, 0.03797616],
-            [0.044863533, 0.053, 0.044863533],
-            [0.03797616, 0.044863533, 0.03797616]
-        ]
+        kernel = get_kernel(size=11, std=3)
         kernel = torch.Tensor(kernel).unsqueeze(0).unsqueeze(0)
         self.weight = nn.Parameter(data=kernel, requires_grad=False)
 
@@ -37,9 +42,9 @@ class GaussianBlur(nn.Module):
         x1 = x[:, 0].unsqueeze(1)
         x2 = x[:, 1].unsqueeze(1)
         x3 = x[:, 2].unsqueeze(1)
-        x1 = F.conv2d(x1, self.weight, padding=1)
-        x2 = F.conv2d(x2, self.weight, padding=1)
-        x3 = F.conv2d(x3, self.weight, padding=1)
+        x1 = F.conv2d(x1, self.weight, padding=5)
+        x2 = F.conv2d(x2, self.weight, padding=5)
+        x3 = F.conv2d(x3, self.weight, padding=5)
         x = torch.cat([x1, x2, x3], dim=1)
         return x
 
@@ -96,13 +101,13 @@ class Discriminator(nn.Module):
             nn.Conv2d(48, 128, 5, stride=2, padding=2),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
             nn.InstanceNorm2d(128, affine=True),
-            nn.Conv2d(128, 192, 3, stride=1, padding=1),
-            nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            nn.InstanceNorm2d(192, affine=True),
-            nn.Conv2d(192, 192, 3, stride=1, padding=1),
-            nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            nn.InstanceNorm2d(192, affine=True),
-            nn.Conv2d(192, 128, 3, stride=2, padding=1),
+#             nn.Conv2d(128, 192, 3, stride=1, padding=1),
+#             nn.LeakyReLU(negative_slope=0.2, inplace=True),
+#             nn.InstanceNorm2d(192, affine=True),
+#             nn.Conv2d(192, 192, 3, stride=1, padding=1),
+#             nn.LeakyReLU(negative_slope=0.2, inplace=True),
+#             nn.InstanceNorm2d(192, affine=True),
+            nn.Conv2d(128, 128, 3, stride=2, padding=1),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
             nn.InstanceNorm2d(128, affine=True),
         )
@@ -190,8 +195,8 @@ class WESPE:
 
         self.g_optimizer = optim.Adam(lr=5e-4, params=self.generator_g.parameters())
         self.f_optimizer = optim.Adam(lr=5e-4, params=self.generator_f.parameters())
-        self.c_optimizer = optim.Adam(lr=5e-4, params=self.discriminator_c.parameters())
-        self.t_optimizer = optim.Adam(lr=5e-4, params=self.discriminator_t.parameters())
+        self.c_optimizer = optim.Adam(lr=5e-5, params=self.discriminator_c.parameters())
+        self.t_optimizer = optim.Adam(lr=5e-5, params=self.discriminator_t.parameters())
 
         self.vgg = VGG().cuda()
         self.blur = GaussianBlur().cuda()
@@ -221,7 +226,7 @@ class WESPE:
         y_fake_gray = self.gray(y_fake)
         texture_generation_loss = self.texture_criterion(self.discriminator_t(y_fake_gray), pos_labels)
 
-        generator_loss = content_loss + 10.0 * tv_loss
+        generator_loss = content_loss + 100.0 * tv_loss
         generator_loss += 5e-3 * (color_generation_loss + texture_generation_loss)
 
         self.g_optimizer.zero_grad()
@@ -245,7 +250,8 @@ class WESPE:
             + self.texture_criterion(self.discriminator_t(y_fake_gray.detach()), neg_labels)
 
         discriminator_loss = color_discriminator_loss + texture_discriminator_loss
-
+        
+        #if np.random.rand() > 0.5:
         self.c_optimizer.zero_grad()
         self.t_optimizer.zero_grad()
         discriminator_loss.backward()
@@ -257,7 +263,7 @@ class WESPE:
             'tv': tv_loss.item(),
             'color_generation': color_generation_loss.item(),
             'texture_generation': texture_generation_loss.item(),
-            'color_discriminator': color_discriminator_loss.item()
+            'color_discriminator': color_discriminator_loss.item(),
             'texture_discriminator': texture_discriminator_loss.item(),
         }
         return loss_dict

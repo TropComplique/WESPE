@@ -25,7 +25,7 @@ class PairDataset(Dataset):
         self.transform = transforms.Compose([
             transforms.RandomCrop(image_size),
             transforms.RandomHorizontalFlip(),
-            transforms.RandomVerticalFlip(),
+            # transforms.RandomVerticalFlip(),
             transforms.ToTensor(),
         ])
 

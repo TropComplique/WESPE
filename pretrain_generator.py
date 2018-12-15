@@ -6,8 +6,9 @@ from input_pipeline import PairDataset
 from model import Generator
 
 
-NUM_STEPS = 100000
+NUM_STEPS = 5000
 IMAGE_SIZE = 64
+BATCH_SIZE = 32
 
 
 def main():
@@ -15,12 +16,12 @@ def main():
     dataset = PairDataset(
         first_dir='',
         second_dir='',
-        num_samples=NUM_STEPS,
+        num_samples=NUM_STEPS * BATCH_SIZE,
         image_size=IMAGE_SIZE
     )
     data_loader = DataLoader(
         dataset=dataset,
-        batch_size=32, shuffle=True,
+        batch_size=BATCH_SIZE, shuffle=True,
         num_workers=1, pin_memory=True
     )
     generator = Generator().cuda()
