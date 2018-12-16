@@ -3,35 +3,44 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class ConvBlock(nn.Module):
+class ResBlock(nn.Module):
 
     def __init__(self):
-        super(ConvBlock, self).__init__()
-        self.conv1 = nn.Conv2d(64, 64, 3, padding=1, bias=False)
-        self.conv2 = nn.Conv2d(64, 64, 3, padding=1, bias=False)
-        self.instance_norm1 = nn.InstanceNorm2d(64, affine=True)
-        self.instance_norm2 = nn.InstanceNorm2d(64, affine=True)
+        super(ResBlock, self).__init__()
+
+        self.layers = nn.Sequential(
+            nn.BatchNorm2d(64)
+            nn.ReLU(inplace=True),
+            nn.Conv2d(64, 64, 3, padding=1, bias=False),
+            nn.BatchNorm2d(64)
+            nn.ReLU(inplace=True),
+            nn.Conv2d(64, 64, 3, padding=1, bias=False)
+        )
 
     def forward(self, x):
-        y = F.relu(self.instance_norm1(self.conv1(x)))
-        y = F.relu(self.instance_norm2(self.conv2(y))) + x
-        return y
+        return x + self.layers(x)
 
 
 class Generator(nn.Module):
 
     def __init__(self):
         super(Generator, self).__init__()
-        self.conv1 = nn.Conv2d(3, 64, 9, padding=4)
+        self.beginning = nn.Conv2d(3, 64, 9, padding=4)
         self.blocks = nn.Sequential(
-            ConvBlock(),
-            ConvBlock(),
-            ConvBlock(),
-            ConvBlock(),
+            ResBlock(),
+            ResBlock(),
+            ResBlock(),
+            ResBlock(),
         )
-        self.conv2 = nn.Conv2d(64, 64, 3, padding=1)
-        self.conv3 = nn.Conv2d(64, 64, 3, padding=1)
-        self.conv4 = nn.Conv2d(64, 3, 9, padding=4)
+        self.additional = nn.Sequential(
+            nn.Conv2d(64, 64, 3, padding=1, bias=False),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(64, 64, 3, padding=1, bias=False),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(64, 3, 9, padding=4)
+        )
 
     def forward(self, x):
         """
@@ -43,10 +52,10 @@ class Generator(nn.Module):
             It represents a RGB image with pixel values in [0, 1] range.
         """
         x_initial = x
-        x = F.relu(self.conv1(x))
+        x = 2.0*x - 1.0
+        x = self.beginning(x)
         x = self.blocks(x)
-        x = F.relu(self.conv2(x))
-        x = F.relu(self.conv3(x))
-        x = 0.5 * torch.tanh(self.conv4(x)) + 0.5
+        x = self.additional(x)
+        x = 0.5 * torch.tanh(x) + 0.5
         x = 0.5 * (x_initial + x)
         return x

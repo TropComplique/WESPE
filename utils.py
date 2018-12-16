@@ -40,24 +40,41 @@ class GaussianBlur(nn.Module):
     def __init__(self):
         super(GaussianBlur, self).__init__()
         kernel = get_kernel(size=11, std=3)
-        kernel = torch.Tensor(kernel).unsqueeze(0).unsqueeze(0)
-        self.weight = nn.Parameter(data=kernel, requires_grad=False)
+        kernel = torch.Tensor(kernel).unsqueeze(0).unsqueeze(0).repeat([3, 1, 1, 1])
+        self.kernel = nn.Parameter(data=kernel, requires_grad=False)  # shape [3, 1, 11, 11]
 
     def forward(self, x):
-        x1 = x[:, 0].unsqueeze(1)
-        x2 = x[:, 1].unsqueeze(1)
-        x3 = x[:, 2].unsqueeze(1)
-        x1 = F.conv2d(x1, self.weight, padding=5)
-        x2 = F.conv2d(x2, self.weight, padding=5)
-        x3 = F.conv2d(x3, self.weight, padding=5)
-        x = torch.cat([x1, x2, x3], dim=1)
+        x = F.conv2d(x, self.kernel, padding=5, groups=3)
         return x
 
 
-class GrayLayer(nn.Module):
+class Sobel(nn.Module):
 
     def __init__(self):
-        super(GrayLayer, self).__init__()
+        super(Sobel, self).__init__()
+        kernel = [
+            [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]],
+            [[-1, -2, -1], [0, 0, 0], [1, 2, 1]]
+        ]
+        kernel = torch.Tensor(kernel).unsqueeze(1).repeat([3, 1, 1, 1])  # shape [6, 1, 3, 3]
+        self.kernel = nn.Parameter(data=kernel, requires_grad=False)
+
+    def forward(self, x):
+        """
+        Arguments:
+            x, y: float tensors with shape [b, 3, h, w].
+            They represent RGB images with pixel values in [0, 1] range.
+        Returns:
+            a float tensor with shape [b, 3*2, h, w].
+        """
+        x = F.conv2d(x, self.kernel, padding=5, groups=3)
+        return x
+
+
+class Grayscale(nn.Module):
+
+    def __init__(self):
+        super(Grayscale, self).__init__()
 
     def forward(self, x):
         result = 0.299 * x[:, 0] + 0.587 * x[:, 1] + 0.114 * x[:, 2]
@@ -68,11 +85,16 @@ class ContentLoss(nn.Module):
 
     def __init__(self):
         super(VGG, self).__init__()
+
         self.model = vgg19(pretrained=True).features[:-1]
-        self.mean = torch.Tensor([0.485, 0.456, 0.406]).cuda().view(1, 3, 1, 1)
-        self.std = torch.Tensor([0.229, 0.224, 0.225]).cuda().view(1, 3, 1, 1)
         for p in self.model.parameters():
             p.requires_grad = False
+
+        # normalization
+        mean = torch.Tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1)
+        self.mean = nn.Parameter(data=mean, requires_grad=False)
+        std = torch.Tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1)
+        self.std = nn.Parameter(data=std, requires_grad=False)
 
     def forward(self, x, y):
         """
@@ -108,7 +130,6 @@ class TVLoss(nn.Module):
         Returns:
             a float tensor with shape [].
         """
-
         b, c, h, w = x.size()
         h_tv = torch.pow((x[:, :, 1:, :] - x[:, :, :(h - 1), :]), 2).sum()
         w_tv = torch.pow((x[:, :, :, 1:] - x[:, :, :, :(w - 1)]), 2).sum()

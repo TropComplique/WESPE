@@ -4,42 +4,36 @@ import torch.optim as optim
 
 from generator import Generator
 from discriminator import Discriminator
-from utils import gradient_penalty, GaussianBlur, GrayLayer, ContentLoss, TVLoss
+from utils import gradient_penalty, GaussianBlur, Grayscale, ContentLoss, TVLoss
 
 
 class WESPE:
 
-    def __init__(self, image_size, use_pretrained_generator=False):
+    def __init__(self, image_size):
 
         self.generator_g = Generator().cuda()
         self.generator_f = Generator().cuda()
-        self.discriminator_c = Discriminator(
-            image_size, num_input_channels=3,
-            use_spectral_normalization=True
-        ).cuda()
-        self.discriminator_t = Discriminator(
-            image_size, num_input_channels=1,
-            use_spectral_normalization=True
-        ).cuda()
-
-        if use_pretrained_generator:
-            self.generator_g.load_state_dict(torch.load('models/pretrained_generator.pth'))
-            self.generator_f.load_state_dict(torch.load('models/pretrained_generator.pth'))
+        self.discriminator_c = Discriminator(image_size, num_input_channels=3).cuda()
+        self.discriminator_t = Discriminator(image_size, num_input_channels=1).cuda()
 
         self.content_criterion = ContentLoss().cuda()
         self.tv_criterion = TVLoss().cuda()
         self.color_criterion = nn.BCEWithLogitsLoss().cuda()
         self.texture_criterion = nn.BCEWithLogitsLoss().cuda()
 
+        # for wasserstein gan training
+        # self.color_criterion = lambda x, y: (-(y*x) + (1.0 - y)*x).mean(0)
+        # self.texture_criterion = lambda x, y: (-(y*x) + (1.0 - y)*x).mean(0)
+
         self.g_optimizer = optim.Adam(lr=5e-4, params=self.generator_g.parameters())
         self.f_optimizer = optim.Adam(lr=5e-4, params=self.generator_f.parameters())
-        self.c_optimizer = optim.Adam(lr=5e-5, params=self.discriminator_c.parameters())
-        self.t_optimizer = optim.Adam(lr=5e-5, params=self.discriminator_t.parameters())
+        self.c_optimizer = optim.Adam(lr=5e-4, params=self.discriminator_c.parameters())
+        self.t_optimizer = optim.Adam(lr=5e-4, params=self.discriminator_t.parameters())
 
         self.blur = GaussianBlur().cuda()
-        self.gray = GrayLayer().cuda()
+        self.gray = Grayscale().cuda()
 
-    def train_step(self, x, y):
+    def train_step(self, x, y, update_generator=True):
 
         y_fake = self.generator_g(x)
         x_fake = self.generator_f(y_fake)
@@ -58,17 +52,20 @@ class WESPE:
 
         y_fake_blur = self.blur(y_fake)
         color_generation_loss = self.color_criterion(self.discriminator_c(y_fake_blur), pos_labels)
+
         y_fake_gray = self.gray(y_fake)
         texture_generation_loss = self.texture_criterion(self.discriminator_t(y_fake_gray), pos_labels)
 
-        generator_loss = content_loss + 100.0 * tv_loss
-        generator_loss += 5e-3 * (color_generation_loss + texture_generation_loss)
+        if update_generator:
 
-        self.g_optimizer.zero_grad()
-        self.f_optimizer.zero_grad()
-        generator_loss.backward()
-        self.g_optimizer.step()
-        self.f_optimizer.step()
+            generator_loss = content_loss + 100.0 * tv_loss
+            generator_loss += 5e-3 * (color_generation_loss + texture_generation_loss)
+
+            self.g_optimizer.zero_grad()
+            self.f_optimizer.zero_grad()
+            generator_loss.backward()
+            self.g_optimizer.step()
+            self.f_optimizer.step()
 
         for p in self.discriminator_c.parameters():
             p.requires_grad = True
@@ -77,15 +74,22 @@ class WESPE:
 
         y_real_blur = self.blur(y)
         y_real_gray = self.gray(y)
+        targets = torch.cat([pos_labels, neg_labels], dim=0)
 
-        color_discriminator_loss = self.color_criterion(self.discriminator_c(y_real_blur), pos_labels) \
-            + self.color_criterion(self.discriminator_c(y_fake_blur.detach()), neg_labels)
+        is_real_real = self.discriminator_c(y_real_blur)
+        is_fake_real = self.discriminator_c(y_fake_blur.detach())
+        logits = torch.cat([is_real_real, is_fake_real], dim=0)
+        color_discriminator_loss = self.color_criterion(logits, targets)
 
-        texture_discriminator_loss = self.texture_criterion(self.discriminator_t(y_real_gray), pos_labels) \
-            + self.texture_criterion(self.discriminator_t(y_fake_gray.detach()), neg_labels)
+        is_real_real = self.discriminator_t(y_real_gray)
+        is_fake_real = self.discriminator_t(y_fake_gray.detach())
+        logits = torch.cat([is_real_real, is_fake_real], dim=0)
+        texture_discriminator_loss = self.texture_criterion(logits, targets)
 
+        # alpha = 1.0
         # gp1 = gradient_penalty(y_real_blur, y_fake_blur.detach(), self.discriminator_c)
         # gp2 = gradient_penalty(y_real_gray, y_fake_gray.detach(), self.discriminator_t)
+        # discriminator_loss = color_discriminator_loss + texture_discriminator_loss + alpha * (gp1 + gp2)
 
         discriminator_loss = color_discriminator_loss + texture_discriminator_loss
 

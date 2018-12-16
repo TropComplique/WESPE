@@ -3,12 +3,12 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 from torch.utils.data import DataLoader
 from input_pipeline import PairDataset
-from model import WESPE
+from wespe import WESPE
 import json
 
 
 NUM_STEPS = 15000
-IMAGE_SIZE = 112
+IMAGE_SIZE = 96
 BATCH_SIZE = 32
 MODEL_SAVE_PREFIX = 'models/run00'
 TRAIN_LOGS = 'losses_run00.json'
@@ -27,7 +27,7 @@ def main():
         batch_size=BATCH_SIZE, shuffle=True,
         num_workers=1, pin_memory=True
     )
-    wespe = WESPE(IMAGE_SIZE, use_pretrained_generator=False)
+    wespe = WESPE(IMAGE_SIZE)
 
     logs = []
     text = 'i: {0}, content: {1:.3f}, tv: {2:.5f}, ' +\
