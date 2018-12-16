@@ -1,4 +1,7 @@
+import numpy as np
 import torch
+import torch.nn as nn
+import torch.nn.functional as F
 from torch.autograd import grad
 from torchvision.models import vgg19
 from scipy import signal
@@ -67,7 +70,7 @@ class GrayLayer(nn.Module):
 class ContentLoss(nn.Module):
 
     def __init__(self):
-        super(VGG, self).__init__()
+        super(ContentLoss, self).__init__()
         self.model = vgg19(pretrained=True).features[:-1]
         self.mean = torch.Tensor([0.485, 0.456, 0.406]).cuda().view(1, 3, 1, 1)
         self.std = torch.Tensor([0.229, 0.224, 0.225]).cuda().view(1, 3, 1, 1)
@@ -82,14 +85,15 @@ class ContentLoss(nn.Module):
         Returns:
             a float tensor with shape [].
         """
+        b = x.size(0)
         x = torch.cat([x, y], dim=0)
         x = (x - self.mean)/self.std
 
         x = self.model(x)
         # relu_5_4 features,
         # a float tensor with shape [2 * b, 512, h/16, w/16]
-
-        x, y = torch.split(x, 2, dim=0)
+        
+        x, y = torch.split(x, b, dim=0)
         b, c, h, w = x.size()
         normalizer = b * c * h * w
         return ((x - y)**2).sum()/normalizer

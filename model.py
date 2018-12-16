@@ -33,8 +33,8 @@ class WESPE:
 
         self.g_optimizer = optim.Adam(lr=5e-4, params=self.generator_g.parameters())
         self.f_optimizer = optim.Adam(lr=5e-4, params=self.generator_f.parameters())
-        self.c_optimizer = optim.Adam(lr=5e-5, params=self.discriminator_c.parameters())
-        self.t_optimizer = optim.Adam(lr=5e-5, params=self.discriminator_t.parameters())
+        self.c_optimizer = optim.Adam(lr=3e-5, params=self.discriminator_c.parameters())
+        self.t_optimizer = optim.Adam(lr=3e-5, params=self.discriminator_t.parameters())
 
         self.blur = GaussianBlur().cuda()
         self.gray = GrayLayer().cuda()

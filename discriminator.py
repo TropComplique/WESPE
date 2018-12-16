@@ -12,25 +12,25 @@ class Discriminator(nn.Module):
         self.final_area = (image_size // 16) ** 2
 
         feature_extractor = [
-            nn.Conv2d(num_input_channels, 48, 11, stride=4, padding=5),
+            nn.Conv2d(num_input_channels, 24, 11, stride=4, padding=5),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            nn.Conv2d(48, 128, 5, stride=2, padding=2),
+            nn.Conv2d(24, 64, 5, stride=2, padding=2),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            nn.InstanceNorm2d(128, affine=True),
-            nn.Conv2d(128, 192, 3, stride=1, padding=1),
+            #nn.InstanceNorm2d(64, affine=True),
+            nn.Conv2d(64, 96, 3, stride=1, padding=1),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            nn.InstanceNorm2d(192, affine=True),
-            nn.Conv2d(192, 192, 3, stride=1, padding=1),
+            #nn.InstanceNorm2d(96, affine=True),
+            nn.Conv2d(96, 96, 3, stride=1, padding=1),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            nn.InstanceNorm2d(192, affine=True),
-            nn.Conv2d(128, 128, 3, stride=2, padding=1),
+            #nn.InstanceNorm2d(96, affine=True),
+            nn.Conv2d(96, 64, 3, stride=2, padding=1),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            nn.InstanceNorm2d(128, affine=True)
+            #nn.InstanceNorm2d(64, affine=True)
         ]
         classifier = [
-            nn.Linear(128 * self.final_area, 1024),
+            nn.Linear(64 * self.final_area, 256),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            nn.Linear(1024, 1)
+            nn.Linear(256, 1)
         ]
 
         # see https://arxiv.org/abs/1802.05957 for the details.
@@ -44,8 +44,8 @@ class Discriminator(nn.Module):
                 for m in classifier
             ]
 
-        self.feature_extractor = nn.ModuleList(feature_extractor)
-        self.classifier = nn.ModuleList(classifier)
+        self.feature_extractor = nn.Sequential(*feature_extractor)
+        self.classifier = nn.Sequential(*classifier)
 
     def forward(self, x):
         """
@@ -57,6 +57,6 @@ class Discriminator(nn.Module):
         """
         b = x.size(0)
         x = self.feature_extractor(x)
-        x = x.view(b, 128 * self.final_area)
+        x = x.view(b, 64 * self.final_area)
         x = self.classifier(x).view(b)
         return x
