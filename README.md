@@ -7,7 +7,7 @@ This an implementation of [WESPE: Weakly Supervised Photo Enhancer for Digital C
 3. Enjoy the results.
 
 ## Credit
-This repository is based on [wondervictor/WESPE.pytorch](https://github.com/wondervictor/WESPE.pytorch).
+This repository is based on [wondervictor/WESPE.pytorch](https://github.com/wondervictor/WESPE.pytorch).  
 Also I used [LynnHo/WGAN-GP-DRAGAN-Celeba-Pytorch](https://github.com/LynnHo/WGAN-GP-DRAGAN-Celeba-Pytorch/).
 
 ## Requirements
