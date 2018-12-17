@@ -67,31 +67,34 @@ class NoiseGenerator(nn.Module):
 
     def __init__(self, image_size):
         super(NoiseGenerator, self).__init__()
-        self.beginning = nn.Conv2d(3, 64, 9, padding=4)
+        self.beginning = spectral_norm(nn.Conv2d(3, 32, 9, padding=4))
 
         def block():
             return nn.Sequential(
-                nn.BatchNorm2d(64),
                 nn.ReLU(inplace=True),
-                nn.Conv2d(64, 64, 3, padding=1, bias=False),
-                nn.BatchNorm2d(64),
+                spectral_norm(nn.Conv2d(32, 32, 3, padding=1)),
                 nn.ReLU(inplace=True),
-                nn.Conv2d(64, 3, 3, padding=1, bias=False)
+                spectral_norm(nn.Conv2d(32, 3, 3, padding=1))
             )
+        self.blocks = nn.ModuleList(8*[block()])
 
-        self.blocks = nn.ModuleList(9*[block()])
+        self.noise_block = nn.Sequential(
+            spectral_norm(nn.Conv2d(1, 32, 3, padding=1)),
+            nn.ReLU(inplace=True),
+            spectral_norm(nn.Conv2d(32, 32, 3, padding=1)),
+            nn.ReLU(inplace=True),
+            spectral_norm(nn.Conv2d(32, 3, 3, padding=1))
+        )
 
         final_size = image_size // 8
         self.weights = nn.Sequential(
-            nn.Conv2d(3, 32, 3, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(64),
+            spectral_norm(nn.Conv2d(3, 32, 3, stride=2, padding=1)),
             nn.ReLU(inplace=True),
-            nn.Conv2d(32, 32, 3, stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(64),
+            spectral_norm(nn.Conv2d(32, 32, 3, stride=2, padding=1)),
             nn.ReLU(inplace=True),
-            nn.Conv2d(32, 32, 3, stride=2, padding=1, bias=False),
+            spectral_norm(nn.Conv2d(32, 32, 3, stride=2, padding=1)),
             nn.AvgPool2d(final_size),
-            nn.Conv2d(32, 10, 1)
+            spectral_norm(nn.Conv2d(32, 10, 1))
         )
 
     def forward(self, x):
@@ -110,14 +113,14 @@ class NoiseGenerator(nn.Module):
         x_initial = x
         b, c, h, w = x.size()
 
-        z = torch.randn(b, 3, h, w)
-        noise = 0.5 * torch.tanh(self.blocks[0](z)) + 0.5
+        z = torch.randn(b, 1, h, w)
+        noise = 0.5 * torch.tanh(self.noise_block(z)) + 0.5
 
         x = 2.0*x - 1.0
         x = self.beginning(x)
 
-        result = [x_initial]
-        for b in self.blocks[1:]:
+        result = [x_initial, noise]
+        for b in self.blocks:
             result.append(0.5 * torch.tanh(b(x)) + 0.5)
 
         result = torch.stack(result, dim=1)  # shape [b, 10, 3, h, w]

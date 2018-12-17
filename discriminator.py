@@ -62,7 +62,7 @@ class DiscriminatorSN(nn.Module):
 
         # final spatial image size
         assert image_size % 16 == 0
-        self.final_size = (image_size // 16) ** 2
+        final_size = image_size // 16
 
         feature_extractor = [
             spectral_norm(nn.Conv2d(num_input_channels, 24, 11, stride=4, padding=5)),
@@ -75,11 +75,12 @@ class DiscriminatorSN(nn.Module):
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
             spectral_norm(nn.Conv2d(32, 32, 3, stride=2, padding=1)),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
+            nn.AvgPool2d(final_size),
         ]
         classifier = [
-            spectral_norm(nn.Linear(32 * self.final_size, 128)),
+            spectral_norm(nn.Linear(32, 32)),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            spectral_norm(nn.Linear(128, 1))
+            spectral_norm(nn.Linear(32, 1))
         ]
 
         self.feature_extractor = nn.Sequential(*feature_extractor)
@@ -96,6 +97,6 @@ class DiscriminatorSN(nn.Module):
         b = x.size(0)
         x = 2.0*x - 1.0
         x = self.feature_extractor(x)
-        x = x.view(b, 32 * self.final_size)
+        x = x.view(b, 32)
         x = self.classifier(x).view(b)
         return x
