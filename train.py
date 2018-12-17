@@ -7,11 +7,12 @@ from wespe import WESPE
 import json
 
 
-NUM_STEPS = 15000
+NUM_STEPS = 50000
 IMAGE_SIZE = 96
-BATCH_SIZE = 32
+BATCH_SIZE = 64
 MODEL_SAVE_PREFIX = 'models/run00'
 TRAIN_LOGS = 'losses_run00.json'
+N_DISCRIMINATOR = 1
 
 
 def main():
@@ -38,7 +39,9 @@ def main():
 
         x = x.cuda()
         y = y.cuda()
-        losses = wespe.train_step(x, y)
+
+        update_generator = i % N_DISCRIMINATOR == 0
+        losses = wespe.train_step(x, y, update_generator)
 
         log = text.format(
             i, losses['content'], losses['tv'],

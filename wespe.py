@@ -4,7 +4,12 @@ import torch.optim as optim
 
 from generator import Generator
 from discriminator import Discriminator, DiscriminatorSN
-from utils import gradient_penalty, GaussianBlur, Grayscale, ContentLoss, TVLoss, Sobel
+from utils import GaussianBlur, Grayscale, Sobel
+from utils import gradient_penalty, ContentLoss, TVLoss
+
+
+GENERATOR_LR = 1e-4
+DISCRIMINATOR_LR = 1e-4
 
 
 class WESPE:
@@ -14,7 +19,7 @@ class WESPE:
         self.generator_g = Generator().cuda()
         self.generator_f = Generator().cuda()
         self.discriminator_c = DiscriminatorSN(image_size, num_input_channels=3).cuda()
-        self.discriminator_t = DiscriminatorSN(image_size, num_input_channels=6).cuda()
+        self.discriminator_t = DiscriminatorSN(image_size, num_input_channels=1).cuda()
 
         self.content_criterion = ContentLoss().cuda()
         self.tv_criterion = TVLoss().cuda()
@@ -25,14 +30,13 @@ class WESPE:
         # self.color_criterion = lambda x, y: (-(y*x) + (1.0 - y)*x).mean(0)
         # self.texture_criterion = lambda x, y: (-(y*x) + (1.0 - y)*x).mean(0)
 
-        self.g_optimizer = optim.Adam(lr=5e-4, params=self.generator_g.parameters())
-        self.f_optimizer = optim.Adam(lr=5e-4, params=self.generator_f.parameters())
-        self.c_optimizer = optim.Adam(lr=5e-4, params=self.discriminator_c.parameters())
-        self.t_optimizer = optim.Adam(lr=5e-4, params=self.discriminator_t.parameters())
+        self.g_optimizer = optim.Adam(lr=GENERATOR_LR, params=self.generator_g.parameters(), betas=(0.5, 0.999))
+        self.f_optimizer = optim.Adam(lr=GENERATOR_LR, params=self.generator_f.parameters(), betas=(0.5, 0.999))
+        self.c_optimizer = optim.Adam(lr=DISCRIMINATOR_LR, params=self.discriminator_c.parameters(), betas=(0.5, 0.999))
+        self.t_optimizer = optim.Adam(lr=DISCRIMINATOR_LR, params=self.discriminator_t.parameters(), betas=(0.5, 0.999))
 
         self.blur = GaussianBlur().cuda()
-        # self.gray = Grayscale().cuda()
-        self.gray = Sobel().cuda()
+        self.gray = Grayscale().cuda()
 
     def train_step(self, x, y, update_generator=True):
 
@@ -60,7 +64,7 @@ class WESPE:
         if update_generator:
 
             generator_loss = content_loss + 100.0 * tv_loss
-            generator_loss += 5e-1 * (color_generation_loss + texture_generation_loss)
+            generator_loss += 5e-2 * (color_generation_loss + texture_generation_loss)
 
             self.g_optimizer.zero_grad()
             self.f_optimizer.zero_grad()
@@ -87,12 +91,11 @@ class WESPE:
         logits = torch.cat([is_real_real, is_fake_real], dim=0)
         texture_discriminator_loss = self.texture_criterion(logits, targets)
 
-        # alpha = 1.0
+        discriminator_loss = color_discriminator_loss + texture_discriminator_loss
+        # lambda_constant = 1.0
         # gp1 = gradient_penalty(y_real_blur, y_fake_blur.detach(), self.discriminator_c)
         # gp2 = gradient_penalty(y_real_gray, y_fake_gray.detach(), self.discriminator_t)
-        # discriminator_loss = color_discriminator_loss + texture_discriminator_loss + alpha * (gp1 + gp2)
-
-        discriminator_loss = color_discriminator_loss + texture_discriminator_loss
+        # discriminator_loss += lambda_constant * (gp1 + gp2)
 
         self.c_optimizer.zero_grad()
         self.t_optimizer.zero_grad()

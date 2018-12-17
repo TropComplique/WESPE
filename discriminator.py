@@ -30,10 +30,10 @@ class Discriminator(nn.Module):
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
         ]
         classifier = [
-            nn.Linear(64 * self.final_size, 256, bias=False),
-            nn.BatchNorm1d(256),
+            nn.Linear(64 * self.final_size, 128, bias=False),
+            nn.BatchNorm1d(128),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            nn.Linear(256, 1)
+            nn.Linear(128, 1)
         ]
 
         self.feature_extractor = nn.Sequential(*feature_extractor)
