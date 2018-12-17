@@ -9,10 +9,10 @@ class ResBlock(nn.Module):
         super(ResBlock, self).__init__()
 
         self.layers = nn.Sequential(
-            nn.BatchNorm2d(64)
+            nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
             nn.Conv2d(64, 64, 3, padding=1, bias=False),
-            nn.BatchNorm2d(64)
+            nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
             nn.Conv2d(64, 64, 3, padding=1, bias=False)
         )

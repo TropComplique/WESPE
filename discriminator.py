@@ -31,7 +31,7 @@ class Discriminator(nn.Module):
         ]
         classifier = [
             nn.Linear(64 * self.final_size, 256, bias=False),
-            nn.BatchNorm2d(256),
+            nn.BatchNorm1d(256),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
             nn.Linear(256, 1)
         ]
@@ -47,9 +47,10 @@ class Discriminator(nn.Module):
         Returns:
             a float tensor with shape [b].
         """
+        b = x.size(0)
         x = 2.0*x - 1.0
         x = self.feature_extractor(x)
-        x = x.view(x.size(0), 64 * self.final_size)
+        x = x.view(b, 64 * self.final_size)
         x = self.classifier(x).view(b)
         return x
 
@@ -57,6 +58,7 @@ class Discriminator(nn.Module):
 class DiscriminatorSN(nn.Module):
 
     def __init__(self, image_size, num_input_channels):
+        super(DiscriminatorSN, self).__init__()
 
         # final spatial image size
         assert image_size % 16 == 0
@@ -65,19 +67,19 @@ class DiscriminatorSN(nn.Module):
         feature_extractor = [
             spectral_norm(nn.Conv2d(num_input_channels, 24, 11, stride=4, padding=5)),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            spectral_norm(nn.Conv2d(24, 64, 5, stride=2, padding=2)),
+            spectral_norm(nn.Conv2d(24, 32, 5, stride=2, padding=2)),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            spectral_norm(nn.Conv2d(64, 96, 3, stride=1, padding=1)),
+            spectral_norm(nn.Conv2d(32, 32, 3, stride=1, padding=1)),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            spectral_norm(nn.Conv2d(96, 96, 3, stride=1, padding=1)),
+            spectral_norm(nn.Conv2d(32, 32, 3, stride=1, padding=1)),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            spectral_norm(nn.Conv2d(96, 64, 3, stride=2, padding=1)),
+            spectral_norm(nn.Conv2d(32, 32, 3, stride=2, padding=1)),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
         ]
         classifier = [
-            spectral_norm(nn.Linear(64 * self.final_size, 256)),
+            spectral_norm(nn.Linear(32 * self.final_size, 128)),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            spectral_norm(nn.Linear(256, 1))
+            spectral_norm(nn.Linear(128, 1))
         ]
 
         self.feature_extractor = nn.Sequential(*feature_extractor)
@@ -91,8 +93,9 @@ class DiscriminatorSN(nn.Module):
         Returns:
             a float tensor with shape [b].
         """
+        b = x.size(0)
         x = 2.0*x - 1.0
         x = self.feature_extractor(x)
-        x = x.view(x.size(0), 64 * self.final_size)
+        x = x.view(b, 32 * self.final_size)
         x = self.classifier(x).view(b)
         return x

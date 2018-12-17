@@ -70,7 +70,7 @@ class Sobel(nn.Module):
         Returns:
             a float tensor with shape [b, 3*2, h, w].
         """
-        x = F.conv2d(x, self.kernel, padding=5, groups=3)
+        x = F.conv2d(x, self.kernel, padding=1, groups=3)
         return x
 
 
@@ -87,7 +87,7 @@ class Grayscale(nn.Module):
 class ContentLoss(nn.Module):
 
     def __init__(self):
-        super(VGG, self).__init__()
+        super(ContentLoss, self).__init__()
 
         self.model = vgg19(pretrained=True).features[:-1]
         for p in self.model.parameters():
