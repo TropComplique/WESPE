@@ -9,7 +9,7 @@ from utils import gradient_penalty, ContentLoss, TVLoss
 
 
 GENERATOR_LR = 1e-4
-DISCRIMINATOR_LR = 1e-4
+DISCRIMINATOR_LR = 4e-4
 
 
 class WESPE:
@@ -30,10 +30,10 @@ class WESPE:
         # self.color_criterion = lambda x, y: (-(y*x) + (1.0 - y)*x).mean(0)
         # self.texture_criterion = lambda x, y: (-(y*x) + (1.0 - y)*x).mean(0)
 
-        self.g_optimizer = optim.Adam(lr=GENERATOR_LR, params=self.generator_g.parameters(), betas=(0.5, 0.999))
-        self.f_optimizer = optim.Adam(lr=GENERATOR_LR, params=self.generator_f.parameters(), betas=(0.5, 0.999))
-        self.c_optimizer = optim.Adam(lr=DISCRIMINATOR_LR, params=self.discriminator_c.parameters(), betas=(0.5, 0.999))
-        self.t_optimizer = optim.Adam(lr=DISCRIMINATOR_LR, params=self.discriminator_t.parameters(), betas=(0.5, 0.999))
+        self.g_optimizer = optim.Adam(lr=GENERATOR_LR, params=self.generator_g.parameters(), betas=(0.0, 0.999))
+        self.f_optimizer = optim.Adam(lr=GENERATOR_LR, params=self.generator_f.parameters(), betas=(0.0, 0.999))
+        self.c_optimizer = optim.Adam(lr=DISCRIMINATOR_LR, params=self.discriminator_c.parameters(), betas=(0.0, 0.999))
+        self.t_optimizer = optim.Adam(lr=DISCRIMINATOR_LR, params=self.discriminator_t.parameters(), betas=(0.0, 0.999))
 
         self.blur = GaussianBlur().cuda()
         self.gray = Grayscale().cuda()

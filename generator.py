@@ -53,13 +53,13 @@ class Generator(nn.Module):
             a float tensor with shape [b, 3, h, w].
             It represents a RGB image with pixel values in [0, 1] range.
         """
-        x_initial = x
+        # x_initial = x
         x = 2.0*x - 1.0
         x = self.beginning(x)
         x = self.blocks(x)
         x = self.additional(x)
         x = 0.5 * torch.tanh(x) + 0.5
-        x = 0.5 * (x_initial + x)
+        # x = 0.5 * (x_initial + x)
         return x
 
 
@@ -90,7 +90,7 @@ class NoiseGenerator(nn.Module):
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
             nn.Conv2d(32, 32, 3, stride=2, padding=1, bias=False),
-            nn.AvgPool2d(final_size)
+            nn.AvgPool2d(final_size),
             nn.Conv2d(32, 10, 1)
         )
 
