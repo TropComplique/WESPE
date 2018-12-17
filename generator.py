@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.nn.utils import spectral_norm
 
 
 class ResBlock(nn.Module):
@@ -43,6 +44,7 @@ class Generator(nn.Module):
             nn.ReLU(inplace=True),
             nn.Conv2d(64, 3, 9, padding=4)
         )
+        # self.dropout = nn.Dropout(p=0.5)
 
     def forward(self, x):
         """
@@ -53,13 +55,11 @@ class Generator(nn.Module):
             a float tensor with shape [b, 3, h, w].
             It represents a RGB image with pixel values in [0, 1] range.
         """
-        # x_initial = x
         x = 2.0*x - 1.0
         x = self.beginning(x)
         x = self.blocks(x)
         x = self.additional(x)
         x = 0.5 * torch.tanh(x) + 0.5
-        # x = 0.5 * (x_initial + x)
         return x
 
 
@@ -109,14 +109,69 @@ class NoiseGenerator(nn.Module):
 
         x_initial = x
         b, c, h, w = x.size()
-        z = torch.randn(b, h, w)
+
+        z = torch.randn(b, 3, h, w)
+        noise = 0.5 * torch.tanh(self.blocks[0](z)) + 0.5
 
         x = 2.0*x - 1.0
         x = self.beginning(x)
 
         result = [x_initial]
-        for b in self.blocks:
+        for b in self.blocks[1:]:
             result.append(0.5 * torch.tanh(b(x)) + 0.5)
 
         result = torch.stack(result, dim=1)  # shape [b, 10, 3, h, w]
         return (weights * result).sum(1)
+
+
+class ResBlockSN(nn.Module):
+
+    def __init__(self):
+        super(ResBlock, self).__init__()
+
+        self.layers = nn.Sequential(
+            nn.ReLU(inplace=True),
+            spectral_norm(nn.Conv2d(64, 64, 3, padding=1)),
+            nn.ReLU(inplace=True),
+            spectral_norm(nn.Conv2d(64, 64, 3, padding=1))
+        )
+
+    def forward(self, x):
+        return x + self.layers(x)
+
+
+class GeneratorSN(nn.Module):
+
+    def __init__(self):
+        super(Generator, self).__init__()
+        self.beginning = spectral_norm(nn.Conv2d(3, 64, 9, padding=4))
+        self.blocks = nn.Sequential(
+            ResBlockSN(),
+            ResBlockSN(),
+            ResBlockSN(),
+            ResBlockSN(),
+        )
+        self.additional = nn.Sequential(
+            nn.ReLU(inplace=True),
+            spectral_norm(nn.Conv2d(64, 64, 3, padding=1)),
+            nn.ReLU(inplace=True),
+            spectral_norm(nn.Conv2d(64, 64, 3, padding=1)),
+            nn.ReLU(inplace=True),
+            spectral_norm(nn.Conv2d(64, 3, 9, padding=4))
+        )
+
+    def forward(self, x):
+        """
+        Arguments:
+            x: a float tensor with shape [b, 3, h, w].
+            It represents a RGB image with pixel values in [0, 1] range.
+        Returns:
+            a float tensor with shape [b, 3, h, w].
+            It represents a RGB image with pixel values in [0, 1] range.
+        """
+        x = 2.0*x - 1.0
+        x = self.beginning(x)
+        x = self.blocks(x)
+        x = self.additional(x)
+        x = 0.5 * torch.tanh(x) + 0.5
+        return x
