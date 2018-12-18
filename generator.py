@@ -71,9 +71,9 @@ class NoiseGenerator(nn.Module):
 
         def block():
             return nn.Sequential(
-                nn.ReLU(inplace=True),
+                nn.ReLU(),
                 spectral_norm(nn.Conv2d(32, 32, 3, padding=1)),
-                nn.ReLU(inplace=True),
+                nn.ReLU(),
                 spectral_norm(nn.Conv2d(32, 3, 3, padding=1))
             )
         self.blocks = nn.ModuleList(8*[block()])
@@ -113,7 +113,7 @@ class NoiseGenerator(nn.Module):
         x_initial = x
         b, c, h, w = x.size()
 
-        z = torch.randn(b, 1, h, w)
+        z = torch.randn(b, 1, h, w).cuda()
         noise = 0.5 * torch.tanh(self.noise_block(z)) + 0.5
 
         x = 2.0*x - 1.0
@@ -130,7 +130,7 @@ class NoiseGenerator(nn.Module):
 class ResBlockSN(nn.Module):
 
     def __init__(self):
-        super(ResBlock, self).__init__()
+        super(ResBlockSN, self).__init__()
 
         self.layers = nn.Sequential(
             nn.ReLU(inplace=True),
@@ -146,7 +146,7 @@ class ResBlockSN(nn.Module):
 class GeneratorSN(nn.Module):
 
     def __init__(self):
-        super(Generator, self).__init__()
+        super(GeneratorSN, self).__init__()
         self.beginning = spectral_norm(nn.Conv2d(3, 64, 9, padding=4))
         self.blocks = nn.Sequential(
             ResBlockSN(),
