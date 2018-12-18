@@ -13,7 +13,7 @@ class PairDataset(Dataset):
         Arguments:
             first_dir, second_dir: strings, paths to folders with images.
             num_samples: an integer.
-            image_size: an integer.
+            image_size: a tuple of integers (height, width).
         """
 
         self.names1 = os.listdir(first_dir)
@@ -35,7 +35,7 @@ class PairDataset(Dataset):
     def __getitem__(self, _):
         """
         Get a random pair of image crops.
-        It returns a tuple of float tensors with shape [3, image_size, image_size].
+        It returns a tuple of float tensors with shape [3, height, width].
         They represent RGB images with pixel values in [0, 1] range.
         """
         i = np.random.randint(0, len(self.names1))

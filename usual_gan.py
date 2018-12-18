@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from generator import Generator, NoiseGenerator, GeneratorSN
-from discriminator import Discriminator, DiscriminatorSN
+from generators import GeneratorSN
+from discriminators import DiscriminatorSN
 from utils import gradient_penalty, ContentLoss, TVLoss
 
 
@@ -11,23 +11,22 @@ GENERATOR_LR = 1e-4
 DISCRIMINATOR_LR = 4e-4
 
 
-class WESPE:
+class GAN:
 
     def __init__(self, image_size):
 
-        # self.generator_g = NoiseGenerator(image_size).cuda() # run00
-        # self.generator_g = Generator().cuda() # run01
-        self.generator_g = GeneratorSN().cuda()  # run02
-        self.generator_f = Generator().cuda()
+        self.generator_g = GeneratorSN().cuda()
+        self.generator_f = GeneratorSN().cuda()
         self.discriminator = DiscriminatorSN(image_size, num_input_channels=3).cuda()
 
         self.content_criterion = ContentLoss().cuda()
         self.tv_criterion = TVLoss().cuda()
         self.realism_criterion = nn.BCEWithLogitsLoss().cuda()
 
-        self.g_optimizer = optim.Adam(lr=GENERATOR_LR, params=self.generator_g.parameters(), betas=(0.0, 0.9))
-        self.f_optimizer = optim.Adam(lr=GENERATOR_LR, params=self.generator_f.parameters(), betas=(0.0, 0.9))
-        self.d_optimizer = optim.Adam(lr=DISCRIMINATOR_LR, params=self.discriminator.parameters(), betas=(0.0, 0.9))
+        betas = (0.0, 0.9)
+        self.g_optimizer = optim.Adam(self.generator_g.parameters(), lr=GENERATOR_LR, betas=betas)
+        self.f_optimizer = optim.Adam(self.generator_f.parameters(), lr=GENERATOR_LR, betas=betas)
+        self.d_optimizer = optim.Adam(self.discriminator.parameters(), lr=DISCRIMINATOR_LR, betas=betas)
 
     def train_step(self, x, y, update_generator=True):
 
@@ -81,3 +80,14 @@ class WESPE:
         torch.save(self.generator_f.state_dict(), model_path + '_generator_f.pth')
         torch.save(self.generator_g.state_dict(), model_path + '_generator_g.pth')
         torch.save(self.discriminator.state_dict(), model_path + '_discriminator_t.pth')
+
+
+"""
+for wasserstein gan training:
+self.color_criterion = lambda x, y: (-(y*x) + (1.0 - y)*x).mean(0)
+self.texture_criterion = lambda x, y: (-(y*x) + (1.0 - y)*x).mean(0)
+lambda_constant = 1.0
+gp1 = gradient_penalty(y_real_blur, y_fake_blur.detach(), self.discriminator_c)
+gp2 = gradient_penalty(y_real_gray, y_fake_gray.detach(), self.discriminator_t)
+discriminator_loss += lambda_constant * (gp1 + gp2)
+"""

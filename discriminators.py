@@ -9,28 +9,29 @@ class Discriminator(nn.Module):
         super(Discriminator, self).__init__()
 
         # final spatial image size
-        assert image_size % 16 == 0
-        self.final_size = (image_size // 16) ** 2
+        height, width = image_size
+        assert height % 16 == 0 and width % 16 == 0
+        self.final_area = (height // 16) * (width // 16)
 
         feature_extractor = [
             nn.Conv2d(num_input_channels, 24, 11, stride=4, padding=5, bias=False),
             nn.BatchNorm2d(24),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            nn.Conv2d(24, 64, 5, stride=2, padding=2, bias=False),
+            nn.Conv2d(24, 32, 5, stride=2, padding=2, bias=False),
+            nn.BatchNorm2d(32),
+            nn.LeakyReLU(negative_slope=0.2, inplace=True),
+            nn.Conv2d(32, 64, 3, stride=1, padding=1, bias=False),
             nn.BatchNorm2d(64),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            nn.Conv2d(64, 96, 3, stride=1, padding=1, bias=False),
-            nn.BatchNorm2d(96),
-            nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            nn.Conv2d(96, 96, 3, stride=1, padding=1, bias=False),
-            nn.BatchNorm2d(96),
-            nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            nn.Conv2d(96, 64, 3, stride=2, padding=1, bias=False),
+            nn.Conv2d(64, 64, 3, stride=1, padding=1, bias=False),
             nn.BatchNorm2d(64),
+            nn.LeakyReLU(negative_slope=0.2, inplace=True),
+            nn.Conv2d(64, 32, 3, stride=2, padding=1, bias=False),
+            nn.BatchNorm2d(32),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
         ]
         classifier = [
-            nn.Linear(64 * self.final_size, 128, bias=False),
+            nn.Linear(32 * self.final_area, 128, bias=False),
             nn.BatchNorm1d(128),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
             nn.Linear(128, 1)
@@ -50,7 +51,7 @@ class Discriminator(nn.Module):
         b = x.size(0)
         x = 2.0*x - 1.0
         x = self.feature_extractor(x)
-        x = x.view(b, 64 * self.final_size)
+        x = x.view(b, 32 * self.final_area)
         x = self.classifier(x).view(b)
         return x
 
@@ -61,19 +62,20 @@ class DiscriminatorSN(nn.Module):
         super(DiscriminatorSN, self).__init__()
 
         # final spatial image size
-        assert image_size % 16 == 0
-        final_size = image_size // 16
+        height, width = image_size
+        assert height % 16 == 0 and width % 16 == 0
+        final_size = (height // 16, width // 16)
 
         feature_extractor = [
             spectral_norm(nn.Conv2d(num_input_channels, 24, 11, stride=4, padding=5)),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
             spectral_norm(nn.Conv2d(24, 32, 5, stride=2, padding=2)),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            spectral_norm(nn.Conv2d(32, 32, 3, stride=1, padding=1)),
+            spectral_norm(nn.Conv2d(32, 64, 3, stride=1, padding=1)),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            spectral_norm(nn.Conv2d(32, 32, 3, stride=1, padding=1)),
+            spectral_norm(nn.Conv2d(64, 64, 3, stride=1, padding=1)),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
-            spectral_norm(nn.Conv2d(32, 32, 3, stride=2, padding=1)),
+            spectral_norm(nn.Conv2d(64, 32, 3, stride=2, padding=1)),
             nn.LeakyReLU(negative_slope=0.2, inplace=True),
             nn.AvgPool2d(final_size),
         ]
@@ -97,6 +99,6 @@ class DiscriminatorSN(nn.Module):
         b = x.size(0)
         x = 2.0*x - 1.0
         x = self.feature_extractor(x)
-        x = x.view(b, 32)
+        x = x.squeeze(2).squeeze(2)  # shape [b, 32]
         x = self.classifier(x).view(b)
         return x

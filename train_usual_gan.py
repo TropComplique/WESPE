@@ -3,16 +3,17 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 from torch.utils.data import DataLoader
 from input_pipeline import PairDataset
-from wespe import WESPE
+from usual_gan import GAN
 import json
 
 
 NUM_STEPS = 50000
-IMAGE_SIZE = 96
+IMAGE_SIZE = (96, 96)  # height and width
 BATCH_SIZE = 64
-MODEL_SAVE_PREFIX = 'models/run00'
-TRAIN_LOGS = 'losses_run00.json'
+MODEL_SAVE_PREFIX = 'models/run01'
+TRAIN_LOGS = 'losses_run01.json'
 N_DISCRIMINATOR = 1
+SAVE_STEP = 1000
 
 
 def main():
@@ -28,31 +29,29 @@ def main():
         batch_size=BATCH_SIZE, shuffle=True,
         num_workers=1, pin_memory=True
     )
-    wespe = WESPE(IMAGE_SIZE)
+    gan = GAN(IMAGE_SIZE)
 
     logs = []
     text = 'i: {0}, content: {1:.3f}, tv: {2:.5f}, ' +\
-           'color generation: {3:.3f}, texture generation: {4:.3f}, ' +\
-           'color discriminator: {5:.3f}, texture discriminator: {6:.3f}'
+           'realism: {3:.3f}, discriminator: {4:.3f}'
 
-    for i, (x, y) in enumerate(data_loader):
+    for i, (x, y) in enumerate(data_loader, 1):
 
         x = x.cuda()
         y = y.cuda()
 
         update_generator = i % N_DISCRIMINATOR == 0
-        losses = wespe.train_step(x, y, update_generator)
+        losses = gan.train_step(x, y, update_generator)
 
         log = text.format(
             i, losses['content'], losses['tv'],
-            losses['color_generation'], losses['texture_generation'],
-            losses['color_discriminator'], losses['texture_discriminator']
+            losses['realism_generation'], losses['discriminator']
         )
         print(log)
         logs.append(losses)
 
-        if (i + 1) % 1000 == 0:
-            wespe.save_model(MODEL_SAVE_PREFIX)
+        if i % SAVE_STEP == 0:
+            gan.save_model(MODEL_SAVE_PREFIX)
             with open(TRAIN_LOGS, 'w') as f:
                 json.dump(logs, f)
 
