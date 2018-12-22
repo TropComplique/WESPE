@@ -1,10 +1,10 @@
 import os
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
+import json
 from torch.utils.data import DataLoader
 from input_pipeline import PairDataset
 from wespe import WESPE
-import json
 
 
 NUM_STEPS = 50000

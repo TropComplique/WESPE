@@ -4,11 +4,7 @@ import torch.optim as optim
 
 from generators import GeneratorSN
 from discriminators import DiscriminatorSN
-from utils import gradient_penalty, ContentLoss, TVLoss
-
-
-GENERATOR_LR = 1e-4
-DISCRIMINATOR_LR = 4e-4
+from utils import ContentLoss, TVLoss
 
 
 class GAN:
@@ -24,9 +20,9 @@ class GAN:
         self.realism_criterion = nn.BCEWithLogitsLoss().cuda()
 
         betas = (0.0, 0.9)
-        self.g_optimizer = optim.Adam(self.generator_g.parameters(), lr=GENERATOR_LR, betas=betas)
-        self.f_optimizer = optim.Adam(self.generator_f.parameters(), lr=GENERATOR_LR, betas=betas)
-        self.d_optimizer = optim.Adam(self.discriminator.parameters(), lr=DISCRIMINATOR_LR, betas=betas)
+        self.g_optimizer = optim.Adam(self.generator_g.parameters(), lr=1e-4, betas=betas)
+        self.f_optimizer = optim.Adam(self.generator_f.parameters(), lr=1e-4, betas=betas)
+        self.d_optimizer = optim.Adam(self.discriminator.parameters(), lr=4e-4, betas=betas)
 
     def train_step(self, x, y, update_generator=True):
 
@@ -80,14 +76,3 @@ class GAN:
         torch.save(self.generator_f.state_dict(), model_path + '_generator_f.pth')
         torch.save(self.generator_g.state_dict(), model_path + '_generator_g.pth')
         torch.save(self.discriminator.state_dict(), model_path + '_discriminator_t.pth')
-
-
-"""
-for wasserstein gan training:
-self.color_criterion = lambda x, y: (-(y*x) + (1.0 - y)*x).mean(0)
-self.texture_criterion = lambda x, y: (-(y*x) + (1.0 - y)*x).mean(0)
-lambda_constant = 1.0
-gp1 = gradient_penalty(y_real_blur, y_fake_blur.detach(), self.discriminator_c)
-gp2 = gradient_penalty(y_real_gray, y_fake_gray.detach(), self.discriminator_t)
-discriminator_loss += lambda_constant * (gp1 + gp2)
-"""

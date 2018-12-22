@@ -1,5 +1,7 @@
 # WESPE in `pytorch`
-This an implementation of [WESPE: Weakly Supervised Photo Enhancer for Digital Cameras](https://arxiv.org/abs/1709.01118).
+This an implementation of [WESPE: Weakly Supervised Photo Enhancer for Digital Cameras](https://arxiv.org/abs/1709.01118).  
+Also I tried an idea from [Deep Photo Enhancer](https://github.com/nothinglo/Deep-Photo-Enhancer).
+
 
 ## How to use this
 1. Read the code and understand it.

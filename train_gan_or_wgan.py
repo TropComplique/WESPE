@@ -1,11 +1,11 @@
 import os
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
+import json
 from torch.utils.data import DataLoader
 from input_pipeline import PairDataset
-from usual_gan import GAN
-import json
-
+from gan import GAN
+# from wgan import WGAN
 
 NUM_STEPS = 50000
 IMAGE_SIZE = (96, 96)  # height and width
