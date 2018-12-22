@@ -62,9 +62,9 @@ class DiscriminatorSN(nn.Module):
         super(DiscriminatorSN, self).__init__()
 
         # final spatial image size
-        height, width = image_size
-        assert height % 16 == 0 and width % 16 == 0
-        final_size = (height // 16, width // 16)
+        # height, width = image_size
+        # assert height % 16 == 0 and width % 16 == 0
+        final_size = 2 # (height // 16, width // 16)
 
         feature_extractor = [
             spectral_norm(nn.Conv2d(num_input_channels, 24, 11, stride=4, padding=5)),

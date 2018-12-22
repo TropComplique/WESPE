@@ -4,7 +4,7 @@ import torch.optim as optim
 
 from generators import GeneratorSN
 from discriminators import DiscriminatorSN
-from utils import gradient_penalty, ContentLoss, TVLoss
+from utils import ContentLoss, TVLoss
 
 
 GENERATOR_LR = 1e-4
@@ -46,8 +46,8 @@ class GAN:
 
         if update_generator:
 
-            generator_loss = content_loss + 100.0 * tv_loss
-            generator_loss += 5e-2 * realism_generation_loss
+            generator_loss = content_loss + 10.0 * tv_loss  # run01 100
+            generator_loss += 5e-1 * realism_generation_loss  # run01 5e-2
 
             self.g_optimizer.zero_grad()
             self.f_optimizer.zero_grad()

@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 
 from generators import Generator
-from discriminators import Discriminator
+from discriminators import DiscriminatorSN
 from utils import GaussianBlur, Grayscale, ContentLoss, TVLoss
 
 
@@ -13,8 +13,8 @@ class WESPE:
 
         self.generator_g = Generator().cuda()
         self.generator_f = Generator().cuda()
-        self.discriminator_c = Discriminator(image_size, num_input_channels=3).cuda()
-        self.discriminator_t = Discriminator(image_size, num_input_channels=1).cuda()
+        self.discriminator_c = DiscriminatorSN(image_size, num_input_channels=3).cuda()
+        self.discriminator_t = DiscriminatorSN(image_size, num_input_channels=1).cuda()
 
         self.content_criterion = ContentLoss().cuda()
         self.tv_criterion = TVLoss().cuda()
