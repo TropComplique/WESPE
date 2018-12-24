@@ -1,18 +1,19 @@
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 import json
 from torch.utils.data import DataLoader
 from input_pipeline import PairDataset
-from gan import GAN
-# from wgan import WGAN
+# from gan import GAN
+# from oneway_gan import OnewayGAN
+from wgan import WGAN
 
-NUM_STEPS = 50000
+NUM_STEPS = 10000
 IMAGE_SIZE = (96, 96)  # height and width
 BATCH_SIZE = 64
-MODEL_SAVE_PREFIX = 'models/run01'
-TRAIN_LOGS = 'losses_run01.json'
-N_DISCRIMINATOR = 1
+MODEL_SAVE_PREFIX = 'models/run02'
+TRAIN_LOGS = 'losses_run02.json'
+N_DISCRIMINATOR = 5
 SAVE_STEP = 1000
 
 
@@ -29,7 +30,7 @@ def main():
         batch_size=BATCH_SIZE, shuffle=True,
         num_workers=1, pin_memory=True
     )
-    gan = GAN(IMAGE_SIZE)
+    gan = WGAN(IMAGE_SIZE)
 
     logs = []
     text = 'i: {0}, content: {1:.3f}, tv: {2:.5f}, ' +\

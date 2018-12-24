@@ -19,7 +19,7 @@ class OnewayGAN:
         self.realism_criterion = nn.BCEWithLogitsLoss().cuda()
 
         betas = (0.0, 0.9)
-        self.g_optimizer = optim.Adam(self.generator_g.parameters(), lr=1e-4, betas=betas)
+        self.g_optimizer = optim.Adam(self.generator.parameters(), lr=1e-4, betas=betas)
         self.d_optimizer = optim.Adam(self.discriminator.parameters(), lr=4e-4, betas=betas)
 
     def train_step(self, x, y, update_generator=True):
@@ -27,7 +27,7 @@ class OnewayGAN:
         for p in self.discriminator.parameters():
             p.requires_grad = False
 
-        y_fake = self.generator_g(x)
+        y_fake = self.generator(x)
         content_loss = self.content_criterion(x, y_fake)
         tv_loss = self.tv_criterion(y_fake)
 

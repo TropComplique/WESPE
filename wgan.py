@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from generators import Generator
+from generators import GeneratorSN
 from discriminators import Discriminator
 from utils import ContentLoss, TVLoss, gradient_penalty
 
@@ -11,8 +11,8 @@ class WGAN:
 
     def __init__(self, image_size):
 
-        self.generator_g = Generator().cuda()
-        self.generator_f = Generator().cuda()
+        self.generator_g = GeneratorSN().cuda()
+        self.generator_f = GeneratorSN().cuda()
         self.discriminator = Discriminator(image_size, num_input_channels=3).cuda()
 
         self.content_criterion = ContentLoss().cuda()
@@ -20,7 +20,7 @@ class WGAN:
         self.realism_criterion = lambda score, is_real: torch.where(is_real, score.neg(), score).mean(0)
 
         gradient_penalty
-        betas = (0.0, 0.9)
+        betas = (0.5, 0.9)
         self.g_optimizer = optim.Adam(self.generator_g.parameters(), lr=1e-4, betas=betas)
         self.f_optimizer = optim.Adam(self.generator_f.parameters(), lr=1e-4, betas=betas)
         self.d_optimizer = optim.Adam(self.discriminator.parameters(), lr=4e-4, betas=betas)
@@ -61,11 +61,12 @@ class WGAN:
         scores = torch.cat([is_real_real, is_fake_real], dim=0)
         discriminator_loss = self.realism_criterion(scores, targets)
 
-        lambda_constant = 1.0
+        lambda_constant = 5.0
         gp = gradient_penalty(y, y_fake.detach(), self.discriminator)
+        l = discriminator_loss + lambda_constant * gp
 
         self.d_optimizer.zero_grad()
-        (discriminator_loss + lambda_constant * gp).backward()
+        l.backward(retain_graph=True) #
         self.d_optimizer.step()
 
         loss_dict = {
