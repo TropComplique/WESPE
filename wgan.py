@@ -19,7 +19,6 @@ class WGAN:
         self.tv_criterion = TVLoss().cuda()
         self.realism_criterion = lambda score, is_real: torch.where(is_real, score.neg(), score).mean(0)
 
-        gradient_penalty
         betas = (0.5, 0.9)
         self.g_optimizer = optim.Adam(self.generator_g.parameters(), lr=1e-4, betas=betas)
         self.f_optimizer = optim.Adam(self.generator_f.parameters(), lr=1e-4, betas=betas)
@@ -63,10 +62,9 @@ class WGAN:
 
         lambda_constant = 5.0
         gp = gradient_penalty(y, y_fake.detach(), self.discriminator)
-        l = discriminator_loss + lambda_constant * gp
 
         self.d_optimizer.zero_grad()
-        l.backward(retain_graph=True) #
+        (discriminator_loss + lambda_constant * gp).backward(retain_graph=True)
         self.d_optimizer.step()
 
         loss_dict = {
@@ -81,4 +79,4 @@ class WGAN:
     def save_model(self, model_path):
         torch.save(self.generator_f.state_dict(), model_path + '_generator_f.pth')
         torch.save(self.generator_g.state_dict(), model_path + '_generator_g.pth')
-        torch.save(self.discriminator.state_dict(), model_path + '_discriminator_t.pth')
+        torch.save(self.discriminator.state_dict(), model_path + '_discriminator.pth')

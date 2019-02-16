@@ -75,4 +75,4 @@ class GAN:
     def save_model(self, model_path):
         torch.save(self.generator_f.state_dict(), model_path + '_generator_f.pth')
         torch.save(self.generator_g.state_dict(), model_path + '_generator_g.pth')
-        torch.save(self.discriminator.state_dict(), model_path + '_discriminator_t.pth')
+        torch.save(self.discriminator.state_dict(), model_path + '_discriminator.pth')
